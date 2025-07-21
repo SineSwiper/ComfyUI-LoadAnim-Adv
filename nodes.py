@@ -5,8 +5,12 @@ import numpy as np
 import mimetypes
 
 from PIL import Image, ImageOps, ImageSequence
-
 from comfy_api.input_impl import VideoFromFile
+from comfy.comfy_types.node_typing import IO
+from operator import itemgetter
+
+### DEBUG
+import pprint
 
 ### Standalone functions
 
@@ -165,6 +169,83 @@ def load_image_video_from_path(path: str, RGBA: bool=False):
 
     return (output_image, output_mask, audio, frames, float(fps))
 
+def select_indexes_from_any(obj, indexes_to_select: str):
+    len_shape = None
+    if isinstance(obj, torch.Tensor):
+        len_shape = obj.shape[0]
+    elif isinstance(obj, list):
+        len_shape = len(obj)
+    else:
+        raise TypeError(f"Object is not a sliceable type.")
+
+    pprint.pp({ 'obj': obj, 'length': len_shape })
+
+    selected_index: list[int] = []
+    idxs_shape: list[int] = list( range(0, len_shape) )
+    for s in indexes_to_select.strip().split(','):
+        start, end = None, None
+
+        if   '/' in s:
+            stepset = s.strip().split('/', maxsplit=1)
+            if ':' in stepset[0]:
+                ranges = s.strip().split(':', maxsplit=1)
+                start  = int(ranges[0])
+                end    = int(ranges[1])
+            else:
+                start = 0 if not stepset[0] or stepset[0] == '*' else int(stepset[0])
+                end   = len_shape
+            step = int(stepset[1])
+
+            if abs(start) > len_shape:
+                raise IndexError(f"Step start ({start}) is greater than set length ({len_shape}) for '{s}'.")
+            if abs(end) > len_shape:
+                raise IndexError(f"Step end ({end}) is greater than set length ({len_shape}) for '{s}'.")
+
+            # range won't treat negative start/end as "loop around" indexes, so we'll look it up ourselves
+            if start < 0:
+                start = idxs_shape[start]
+            if end < 0:
+                end   = idxs_shape[end]
+
+            selected_index.extend( range(start, end+1, step) )
+        elif ':' in s:
+            ranges = s.strip().split(':', maxsplit=1)
+            start  = ranges[0]
+            end    = ranges[1]
+            if   start and end:
+                selected_index.extend( idxs_shape[int(start):int(end+1)] )
+            elif start:
+                selected_index.extend( idxs_shape[int(start):] )
+            elif end:
+                selected_index.extend( idxs_shape[:int(end+1)] )
+            else:
+                raise ValueError(f"Found a blank range selection string '{s}'.")
+
+        else:
+            x: int = int(s.strip())
+            selected_index.append(x)
+
+    if len(selected_index) == 0:
+        raise ValueError(f"No indexes selected for '{indexes_to_select}'.")
+
+    pprint.pp(selected_index)
+
+    if isinstance(obj, torch.Tensor):
+        return (obj[selected_index],)
+    elif isinstance(obj, list):
+        lst = []
+        if len(selected_index) == 1:
+            # Edge case with itemgetter returning the _inter_ object
+            lst.append(obj[selected_index[0]])
+            pprint.pp(lst)
+            return lst
+        else:
+            lst.append(itemgetter(*selected_index)(obj))
+            pprint.pp(lst)
+            return lst
+    else:
+        raise TypeError(f"Object is not a sliceable type.")
+
 ### Node definitions
 
 class LoadImageVideoFromPath:
@@ -259,12 +340,78 @@ class ListFilesFromDirectory:
             sort_method=sort_method,
         )
 
+class SelectIndexesFromImages:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "images": ("IMAGE", {
+                    "tooltip": "Image set to select from.",
+                }),
+                "indexes_to_select": ("STRING", {
+                    "tooltip": "Indexes (zero-based) to select.  " +
+                        "Supports ':' for range selection (including ':#' and '#:' formats), '*/#' & '#/#' & '#:#/#' formats for step selection," +
+                        "',' for multiple entries, and negative numbers for selecting from the end.",
+                    "default": "0:",
+                }),
+            },
+        }
+
+    INPUT_IS_LIST = True
+    RETURN_TYPES = ("IMAGE", )
+    RETURN_NAMES = ("images",)
+    OUTPUT_TOOLTIPS = (
+        "The selected image set.",
+    )
+    FUNCTION = "execute"
+    DESCRIPTION = "Select specific images from a set, using a variety of supported syntaxes."
+
+    CATEGORY = "image"
+
+    def execute(self, images: torch.Tensor, indexes_to_select):
+        return select_indexes_from_any(obj=images, indexes_to_select=indexes_to_select[0])
+
+class SelectIndexesFromAny:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "any": (IO.ANY, {
+                    "tooltip": "Object set to select from.  Must be a Tensor or list-like object.",
+                }),
+                "indexes_to_select": ("STRING", {
+                    "tooltip": "Indexes (zero-based) to select.  " +
+                        "Supports ':' for range selection (including ':#' and '#:' formats), '*/#' & '#/#' & '#:#/#' formats for step selection," +
+                        "',' for multiple entries, and negative numbers for selecting from the end.",
+                    "default": "0:",
+                }),
+            },
+        }
+
+    INPUT_IS_LIST = True
+    RETURN_TYPES = (IO.ANY, )
+    RETURN_NAMES = ("any",)
+    OUTPUT_TOOLTIPS = (
+        "The selected set.",
+    )
+    FUNCTION = "execute"
+    DESCRIPTION = "Select specific indexes from a set, using a variety of supported syntaxes."
+
+    CATEGORY = "util"
+
+    def execute(self, any, indexes_to_select):
+        return select_indexes_from_any(obj=any, indexes_to_select=indexes_to_select[0])
+
 NODE_CLASS_MAPPINGS = {
-    "LoadAnimAdv_LoadImageVideoFromPath": LoadImageVideoFromPath,
-    "LoadAnimAdv_ListFilesFromDirectory": ListFilesFromDirectory,
+    "LoadAnimAdv_LoadImageVideoFromPath":  LoadImageVideoFromPath,
+    "LoadAnimAdv_ListFilesFromDirectory":  ListFilesFromDirectory,
+    "LoadAnimAdv_SelectIndexesFromImages": SelectIndexesFromImages,
+    "LoadAnimAdv_SelectIndexesFromAny":    SelectIndexesFromAny,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "LoadAnimAdv_LoadImageVideoFromPath": "Load Image/Video From Path",
-    "LoadAnimAdv_ListFilesFromDirectory": "List Files From Directory",
+    "LoadAnimAdv_LoadImageVideoFromPath":  "Load Image/Video From Path",
+    "LoadAnimAdv_ListFilesFromDirectory":  "List Files From Directory",
+    "LoadAnimAdv_SelectIndexesFromImages": "Select Indexes From Images",
+    "LoadAnimAdv_SelectIndexesFromAny":    "Select Indexes From Any",
 }
