@@ -852,8 +852,8 @@ class BasicDimensionVariables:
                     "max": nodes.MAX_RESOLUTION,
                     "step": 16,
                 }),
-                "length": ("INT", {
-                    "tooltip": "Length of the animation/video",
+                "frame_count": ("INT", {
+                    "tooltip": "Frame length of the animation/video.  (Sometimes called 'length', in nodes like WanImageToVideo.)",
                     "default": 81,
                     "min": 0,
                     "max": 4096,
@@ -883,12 +883,12 @@ class BasicDimensionVariables:
         }
 
     RETURN_TYPES = ("BDV_BUS", "INT", "INT", "INT", "INT", "FLOAT", "INT",)
-    RETURN_NAMES = ("bus", "width", "height", "length", "batch_size", "fps", "seed",)
+    RETURN_NAMES = ("bus", "width", "height", "frame_count", "batch_size", "fps", "seed",)
     OUTPUT_TOOLTIPS = (
         "BDV bus output, for use in other BDV nodes.",
         "Width of the image/video",
         "Height of the image/video",
-        "Length of the animation/video",
+        "Frame length of the animation/video",
         "Batch size",
         "Frames per second",
         "Random seed",
@@ -902,21 +902,21 @@ class BasicDimensionVariables:
 
     CATEGORY = "LoadAnimAdv/util"
 
-    def execute(self, bus=(0, 0, 0, 0, 0.00, 0), width=0, height=0, length=0, batch_size=0, fps=0.00, seed=0):
+    def execute(self, bus=(0, 0, 0, 0, 0.00, 0), width=0, height=0, frame_count=0, batch_size=0, fps=0.00, seed=0):
         # Unpack bus, override, repack bus
-        (bus_width, bus_height, bus_length, bus_batch_size, bus_fps, bus_seed) = bus
+        (bus_width, bus_height, bus_frame_count, bus_batch_size, bus_fps, bus_seed) = bus
 
-        out_width      = width      if width      >= 0    else bus_width
-        out_height     = height     if height     >= 0    else bus_height
-        out_length     = length     if length     >= 0    else bus_length
-        out_batch_size = batch_size if batch_size >= 0    else bus_batch_size
-        out_fps        = fps        if fps        >= 0.00 else bus_fps
-        out_seed       = seed       if seed       >= 0    else bus_seed
+        out_width       = width       if width       >= 0     else bus_width
+        out_height      = height      if height      >= 0     else bus_height
+        out_frame_count = frame_count if frame_count >= 0     else bus_frame_count
+        out_batch_size  = batch_size  if batch_size  >= 0     else bus_batch_size
+        out_fps         = fps         if fps         >= 0.00  else bus_fps
+        out_seed        = seed        if seed        >= 0     else bus_seed
 
         out_fps = float(out_fps)
-        out_bus = (out_width, out_height, out_length, out_batch_size, out_fps, out_seed)
+        out_bus = (out_width, out_height, out_frame_count, out_batch_size, out_fps, out_seed)
 
-        return (out_bus, out_width, out_height, out_length, out_batch_size, out_fps, out_seed,)
+        return (out_bus, out_width, out_height, out_frame_count, out_batch_size, out_fps, out_seed,)
 
 class BasicDimensionVariablesRouter:
     @classmethod
@@ -930,12 +930,12 @@ class BasicDimensionVariablesRouter:
         }
 
     RETURN_TYPES = ("BDV_BUS", "INT", "INT", "INT", "INT", "FLOAT", "INT",)
-    RETURN_NAMES = ("bus", "width", "height", "length", "batch_size", "fps", "seed",)
+    RETURN_NAMES = ("bus", "width", "height", "frame_count", "batch_size", "fps", "seed",)
     OUTPUT_TOOLTIPS = (
         "BDV bus output, for use in other BDV nodes.",
         "Width of the image/video",
         "Height of the image/video",
-        "Length of the animation/video",
+        "Frame length of the animation/video",
         "Batch size",
         "Frames per second",
         "Random seed",
@@ -945,8 +945,8 @@ class BasicDimensionVariablesRouter:
     CATEGORY = "LoadAnimAdv/util"
 
     def execute(self, bus=(0, 0, 0, 0, 0.00, 0)):
-        (bus_width, bus_height, bus_length, bus_batch_size, bus_fps, bus_seed) = bus
-        return (bus, bus_width, bus_height, bus_length, bus_batch_size, bus_fps, bus_seed,)
+        (bus_width, bus_height, bus_frame_count, bus_batch_size, bus_fps, bus_seed) = bus
+        return (bus, bus_width, bus_height, bus_frame_count, bus_batch_size, bus_fps, bus_seed,)
 
 NODE_CLASS_MAPPINGS = {
     "LoadAnimAdv_LoadImageVideo":                LoadImageVideo,
