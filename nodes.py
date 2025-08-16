@@ -335,7 +335,7 @@ class LoadImageVideo:
             }
         }
 
-    RETURN_TYPES = ("IMAGE", "MASK", "AUDIO", "INT", "FLOAT")
+    RETURN_TYPES = ("IMAGE",  "MASK", "AUDIO", "INT",         "FLOAT")
     RETURN_NAMES = ("images", "mask", "audio", "frame_count", "fps")
     OUTPUT_TOOLTIPS = (
         "The image data, either as a single image or a set of frames.",
@@ -370,7 +370,7 @@ class LoadImageVideoFromPath:
             }
         }
 
-    RETURN_TYPES = ("IMAGE", "MASK", "AUDIO", "INT", "FLOAT")
+    RETURN_TYPES = ("IMAGE",  "MASK", "AUDIO", "INT",         "FLOAT")
     RETURN_NAMES = ("images", "mask", "audio", "frame_count", "fps")
     OUTPUT_TOOLTIPS = (
         "The image data, either as a single image or a set of frames.",
@@ -715,7 +715,6 @@ class FlattenImageList:
     INPUT_IS_LIST = True
     RETURN_TYPES = ("IMAGE", "MASK")
     RETURN_NAMES = ("images", "masks")
-    OUTPUT_IS_LIST = (True, True)
     OUTPUT_TOOLTIPS = (
         "The combined image set.",
         "The combined mask set.",
@@ -734,7 +733,7 @@ class FlattenImageList:
 
         if len(images) == 0 and len(masks) == 0:
             print("FlattenImageList: No images or masks provided")
-            return ([], [])
+            return (None, None)
 
         if len(images) > 0:
             dest_images = torch.cat(tuple(images), dim=0)
@@ -748,10 +747,7 @@ class FlattenImageList:
             image_size = images[0].size()
             dest_masks = torch.zeros((0, image_size[1], image_size[2], 1), dtype=torch.float32, device="cpu")
 
-        ### XXX: Do we need OUTPUT_IS_LIST=True here?
-
-        # Force a single image object with OUTPUT_IS_LIST
-        return ([dest_images], [dest_masks],)
+        return (dest_images, dest_masks,)
 
 class AggregateNumberList:
     @classmethod
