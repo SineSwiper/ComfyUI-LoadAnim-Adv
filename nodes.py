@@ -13,12 +13,8 @@ from comfy_api.input_impl import VideoFromFile
 from comfy.comfy_types.node_typing import IO
 from operator import itemgetter
 
-### DEBUG
-import pprint
+### Useful globals
 
-### Standalone functions
-
-# Shamelessly stolen from comfyui-inspire-pack
 sort_methods = [
     "None",
     "Alphabetical (ASC)",
@@ -28,7 +24,36 @@ sort_methods = [
     "Datetime (ASC)",
     "Datetime (DESC)"
 ]
+aspect_ratio_resize_methods = [
+    "crop",
+    "pad",
+    "stretch",
+]
+image_loader_common_inputs = {
+    "RGBA": ("BOOLEAN", {
+        "tooltip": "Controls whether to include the Alpha channel in the 'image' output.  The 'mask' output will always include this data.",
+        "default": False,
+    }),
+    "width": ("INT", {
+        "tooltip": "Final width of images, after resizing.  Zero means to keep the original width.",
+        "default": 0,
+        "min":     0,
+        "step":    16,
+    }),
+    "height": ("INT", {
+        "tooltip": "Final height of images, after resizing.  Zero means to keep the original height.",
+        "default": 0,
+        "min":     0,
+        "step":    16,
+    }),
+    "keep_aspect_ratio": (aspect_ratio_resize_methods, {
+        "tooltip": "What action to take, when the image doesn't match the expected aspect ratio.",
+    }),
+}
 
+### Standalone functions
+
+# Shamelessly stolen from comfyui-inspire-pack
 def sort_by(items, base_path='.', method=None):
     def fullpath(x): return os.path.join(base_path, x)
 
@@ -306,10 +331,7 @@ class LoadImageVideo:
                 "image": (sorted(files), {
                     "image_upload": True
                 }),
-                "RGBA": ("BOOLEAN", {
-                    "tooltip": "Controls whether to include the Alpha channel in the 'image' output.  The 'mask' output will always include this data.",
-                    "default": False,
-                }),
+                **image_loader_common_inputs,
             }
         }
 
@@ -327,9 +349,12 @@ class LoadImageVideo:
 
     CATEGORY = "LoadAnimAdv/image"
 
-    def execute(self, image: str, RGBA: bool):
+    def execute(self, image: str, **kwargs):
         image_path = folder_paths.get_annotated_filepath(image)
-        return load_image_video_from_path(path=image_path, RGBA=RGBA)
+        return load_image_video_from_path(
+            path=image_path,
+            **kwargs,
+        )
 
 class LoadImageVideoFromPath:
     @classmethod
@@ -341,10 +366,7 @@ class LoadImageVideoFromPath:
                     "placeholder": "input/images/image.png",
                     "multiline": False,
                 }),
-                "RGBA": ("BOOLEAN", {
-                    "tooltip": "Controls whether to include the Alpha channel in the 'image' output.  The 'mask' output will always include this data.",
-                    "default": False,
-                }),
+                **image_loader_common_inputs,
             }
         }
 
@@ -362,8 +384,11 @@ class LoadImageVideoFromPath:
 
     CATEGORY = "LoadAnimAdv/image"
 
-    def execute(self, path: str, RGBA: bool):
-        return load_image_video_from_path(path=path, RGBA=RGBA)
+    def execute(self, path: str, **kwargs):
+        return load_image_video_from_path(
+            path=path,
+            **kwargs,
+        )
 
 class ListFilesFromDirectory:
     @classmethod
@@ -433,25 +458,7 @@ class LoadImagesVideosFromDirectory:
                     "tooltip": "Absolute or relative path to the image directory.",
                     "multiline": False,
                 }),
-                "RGBA": ("BOOLEAN", {
-                    "tooltip": "Controls whether to include the Alpha channel in the 'image' output.  The 'mask' output will always include this data.",
-                    "default": False,
-                }),
-                "width": ("INT", {
-                    "tooltip": "Final width of images, after resizing.  Zero means to keep the original width.",
-                    "default": 1024,
-                    "min":     0,
-                    "step":    1,
-                }),
-                "height": ("INT", {
-                    "tooltip": "Final height of images, after resizing.  Zero means to keep the original height.",
-                    "default": 1024,
-                    "min":     0,
-                    "step":    1,
-                }),
-                "keep_aspect_ratio": (["crop", "pad", "stretch",], {
-                    "tooltip": "What action to take, when the image doesn't match the expected aspect ratio.",
-                }),
+                **image_loader_common_inputs,
                 "image_file_load_cap": ("INT", {
                     "tooltip": "Maximum amount of image files (not frames) to load.  Zero means no maximum.",
                     "default": 0,
@@ -518,7 +525,10 @@ class LoadImagesVideosFromDirectory:
     CATEGORY = "LoadAnimAdv/image"
 
     def execute(
-        self, directory: str, RGBA: bool, width: int, height: int, keep_aspect_ratio: str,
+        self, directory: str,
+        # from image_loader_common_inputs
+        RGBA: bool, width: int, height: int, keep_aspect_ratio: str,
+
         image_file_load_cap: int = 0, image_file_start_index: int = 0,
         frame_indexes_to_select: str = '0:', total_frame_load_cap: int = 0, flatten_frames: bool = False,
         include_subfolders=False, valid_extensions: str = 'jpg,jpeg,png,webp,gif,tga', sort_method=None
@@ -580,7 +590,6 @@ class LoadImagesVideosFromDirectory:
         if flatten_frames:
             fps_list[0] = fps_list[0] / len(image_paths)
 
-        ### FINISH: Testing!
         return (images, masks, audios, frame_counts, fps_list, image_paths,)
 
 class SelectIndexesFromImages:
