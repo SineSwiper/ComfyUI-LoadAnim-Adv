@@ -3,6 +3,11 @@ name = "comfyui-loadanim-adv"
 description = "Nodes for loading images with animations and videos."
 version = "0.9.0"
 license = { file = "LICENSE" }
+dependencies = [
+    "torch>=2.0.0",
+    "numpy>=1.21.0",
+    "Pillow>=9.0.0"
+]
 
 [project.urls]
 Repository = "https://github.com/SineSwiper/ComfyUI-LoadAnim-Adv"
