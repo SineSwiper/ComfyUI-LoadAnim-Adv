@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-loadanim-adv"
-description = "Nodes for loading images with animations and videos."
+description = "Advanced image and video loading nodes for ComfyUI with comprehensive animation support, batch processing, and flexible frame selection capabilities."
 version = "0.9.0"
 license = { file = "LICENSE" }
 dependencies = [
@@ -14,6 +14,6 @@ Repository = "https://github.com/SineSwiper/ComfyUI-LoadAnim-Adv"
 #  Used by Comfy Registry https://comfyregistry.org
 
 [tool.comfy]
-PublisherId = "SineSwiper"
+PublisherId = "sineswiper"
 DisplayName = "ComfyUI-LoadAnim-Adv"
 Icon = ""
