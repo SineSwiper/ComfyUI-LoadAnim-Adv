@@ -8,6 +8,12 @@ import nodes
 import node_helpers
 import folder_paths
 
+# Import MAX_RESOLUTION from ComfyUI nodes, or define fallback
+try:
+    from nodes import MAX_RESOLUTION
+except ImportError:
+    MAX_RESOLUTION = 16384
+
 from PIL import Image, ImageOps, ImageSequence, ImageStat
 from comfy_api.input_impl import VideoFromFile
 from comfy.comfy_types.node_typing import IO
@@ -196,6 +202,9 @@ def load_image_video_from_path(path: str, RGBA: bool=False, width: int=0, height
         # Resort to our own file extension matching
         if path.split('.')[-1].lower() in ['mp4','api','mov','mkv']:
             file_type = 'video'
+        else:
+            # Default to image for unknown extensions
+            file_type = 'image'
     else:
         file_type = mime_type.split('/', maxsplit=1)[0]
 
@@ -291,15 +300,23 @@ def select_indexes_from_any(obj, indexes_to_select: str):
 
     selected_index: list[int] = []
     idxs_shape: list[int] = list( range(0, len_shape) )
+
+    # Handle empty or whitespace-only input
+    if not indexes_to_select.strip():
+        raise ValueError("No indexes selected")
+
     for s in indexes_to_select.strip().split(','):
+        s = s.strip()
+        if not s:  # Skip empty elements
+            continue
         if ':' in s:
             # https://docs.python.org/3/library/stdtypes.html#range
-            ranges = s.strip().split(':', maxsplit=2)
+            ranges = s.split(':', maxsplit=2)
             ranges = [int(r.strip()) if r.strip()!='' else None for r in ranges]
 
             selected_index.extend( idxs_shape[slice(*ranges)] )
         else:
-            i = int(s.strip())
+            i = int(s)
             selected_index.append(i)
 
     if len(selected_index) == 0:
@@ -911,12 +928,12 @@ class BasicDimensionVariables:
         # Unpack bus, override, repack bus
         (bus_width, bus_height, bus_frame_count, bus_batch_size, bus_fps, bus_seed) = bus
 
-        out_width       = width       if width       >= 0     else bus_width
-        out_height      = height      if height      >= 0     else bus_height
-        out_frame_count = frame_count if frame_count >= 0     else bus_frame_count
-        out_batch_size  = batch_size  if batch_size  >= 0     else bus_batch_size
-        out_fps         = fps         if fps         >= 0.00  else bus_fps
-        out_seed        = seed        if seed        >= 0     else bus_seed
+        out_width       = width       if width       > 0     else bus_width
+        out_height      = height      if height      > 0     else bus_height
+        out_frame_count = frame_count if frame_count > 0     else bus_frame_count
+        out_batch_size  = batch_size  if batch_size  > 0     else bus_batch_size
+        out_fps         = fps         if fps         > 0.00  else bus_fps
+        out_seed        = seed        if seed        > 0     else bus_seed
 
         out_fps = float(out_fps)
         out_bus = (out_width, out_height, out_frame_count, out_batch_size, out_fps, out_seed)
