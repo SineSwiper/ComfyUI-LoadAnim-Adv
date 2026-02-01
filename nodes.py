@@ -19,6 +19,10 @@ from comfy_api.input_impl import VideoFromFile
 from comfy.comfy_types.node_typing import IO
 from operator import itemgetter
 
+### TODO:
+#   * VALIDATE_INPUTS?
+#   * IS_CHANGED?
+
 ### Useful globals
 
 sort_methods = [
@@ -337,6 +341,125 @@ def select_indexes_from_any(obj, indexes_to_select: str):
 
 ### Node definitions
 
+class BasicDimensionVariables:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {},
+            "optional": {
+                "bus": ("BDV_BUS", {
+                    "tooltip": "BDV bus input, from a previous BDV node.  If provided, will serve as an override for any zeroed inputs.",
+                }),
+                "width": ("INT", {
+                    "tooltip": "Width of the image/video",
+                    "default": 512,
+                    "min": 0,
+                    "max": nodes.MAX_RESOLUTION,
+                    "step": 16,
+                }),
+                "height": ("INT", {
+                    "tooltip": "Height of the image/video",
+                    "default": 512,
+                    "min": 0,
+                    "max": nodes.MAX_RESOLUTION,
+                    "step": 16,
+                }),
+                "frame_count": ("INT", {
+                    "tooltip": "Frame length of the animation/video.  (Sometimes called 'length', in nodes like WanImageToVideo.)",
+                    "default": 81,
+                    "min": 0,
+                    "max": 4096,
+                    "step": 1,
+                }),
+                "batch_size": ("INT", {
+                    "tooltip": "Batch size",
+                    "default": 1,
+                    "min": 0,
+                    "max": 4096,
+                    "step": 1,
+                }),
+                "fps": ("FLOAT", {
+                    "tooltip": "Frames per second",
+                    "default": 12.00,
+                    "min": 0.00,
+                    "max": 60.00,
+                }),
+                "seed": ("INT", {
+                    "tooltip": "Random seed",
+                    "default": 0x123456789abcdef0,
+                    "min": 0,
+                    "max": 0xffffffffffffffff,
+                    "control_after_generate": True,
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("BDV_BUS", "INT", "INT", "INT", "INT", "FLOAT", "INT",)
+    RETURN_NAMES = ("bus", "width", "height", "frame_count", "batch_size", "fps", "seed",)
+    OUTPUT_TOOLTIPS = (
+        "BDV bus output, for use in other BDV nodes.",
+        "Width of the image/video",
+        "Height of the image/video",
+        "Frame length of the animation/video",
+        "Batch size",
+        "Frames per second",
+        "Random seed",
+    )
+    FUNCTION = "execute"
+    DESCRIPTION = (
+        "Input node for declaring basic image/video dimensions, to be propagated to other nodes (such as KSampler).  " +
+        "By having a single source for these values, you only have to change them once.  " +
+        "The BDV Router can be used to route these values to other sections of the workflow."
+    )
+
+    CATEGORY = "LoadAnimAdv/BDV"
+
+    def execute(self, bus=(0, 0, 0, 0, 0.00, 0), width=0, height=0, frame_count=0, batch_size=0, fps=0.00, seed=0):
+        # Unpack bus, override, repack bus
+        (bus_width, bus_height, bus_frame_count, bus_batch_size, bus_fps, bus_seed) = bus
+
+        out_width       = width       if width       > 0     else bus_width
+        out_height      = height      if height      > 0     else bus_height
+        out_frame_count = frame_count if frame_count > 0     else bus_frame_count
+        out_batch_size  = batch_size  if batch_size  > 0     else bus_batch_size
+        out_fps         = fps         if fps         > 0.00  else bus_fps
+        out_seed        = seed        if seed        > 0     else bus_seed
+
+        out_fps = float(out_fps)
+        out_bus = (out_width, out_height, out_frame_count, out_batch_size, out_fps, out_seed)
+
+        return (out_bus, out_width, out_height, out_frame_count, out_batch_size, out_fps, out_seed,)
+
+class BasicDimensionVariablesRouter:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "bus": ("BDV_BUS", {
+                    "tooltip": "BDV bus input, from a previous BDV node.",
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("BDV_BUS", "INT", "INT", "INT", "INT", "FLOAT", "INT",)
+    RETURN_NAMES = ("bus", "width", "height", "frame_count", "batch_size", "fps", "seed",)
+    OUTPUT_TOOLTIPS = (
+        "BDV bus output, for use in other BDV nodes.",
+        "Width of the image/video",
+        "Height of the image/video",
+        "Frame length of the animation/video",
+        "Batch size",
+        "Frames per second",
+        "Random seed",
+    )
+    FUNCTION = "execute"
+    DESCRIPTION = "A smaller bus-only 'Basic Dimension Variables' (BDV) node."
+    CATEGORY = "LoadAnimAdv/BDV"
+
+    def execute(self, bus=(0, 0, 0, 0, 0.00, 0)):
+        (bus_width, bus_height, bus_frame_count, bus_batch_size, bus_fps, bus_seed) = bus
+        return (bus, bus_width, bus_height, bus_frame_count, bus_batch_size, bus_fps, bus_seed,)
+
 class LoadImageVideo:
     @classmethod
     def INPUT_TYPES(s):
@@ -364,7 +487,7 @@ class LoadImageVideo:
     FUNCTION = "execute"
     DESCRIPTION = "Load an image or video.  Supports animation frame data, audio, and video."
 
-    CATEGORY = "LoadAnimAdv/image"
+    CATEGORY = "LoadAnimAdv/Loaders"
 
     def execute(self, image: str, **kwargs):
         image_path = folder_paths.get_annotated_filepath(image)
@@ -399,7 +522,7 @@ class LoadImageVideoFromPath:
     FUNCTION = "execute"
     DESCRIPTION = "Load an image or video from a filename path.  Supports animation frame data, audio, and video."
 
-    CATEGORY = "LoadAnimAdv/image"
+    CATEGORY = "LoadAnimAdv/Loaders"
 
     def execute(self, path: str, **kwargs):
         return load_image_video_from_path(
@@ -454,7 +577,7 @@ class ListFilesFromDirectory:
     FUNCTION = "execute"
     DESCRIPTION = "Lists files from a directory."
 
-    CATEGORY = "LoadAnimAdv/util"
+    CATEGORY = "LoadAnimAdv/Loaders"
 
     def execute(self, directory: str, file_list_cap: int, file_start_index: int, include_subfolders: bool, valid_extensions: str, sort_method: str):
         return list_files_from_directory(
@@ -539,7 +662,7 @@ class LoadImagesVideosFromDirectory:
     FUNCTION = "execute"
     DESCRIPTION = "Load a series of images from directory path.  Supports loading frame data."
 
-    CATEGORY = "LoadAnimAdv/image"
+    CATEGORY = "LoadAnimAdv/Loaders"
 
     def execute(
         self, directory: str,
@@ -636,7 +759,7 @@ class SelectIndexesFromImages:
     FUNCTION = "execute"
     DESCRIPTION = "Select specific images from a set, using a variety of supported syntaxes."
 
-    CATEGORY = "LoadAnimAdv/image"
+    CATEGORY = "LoadAnimAdv/Selectors"
 
     def execute(self, images, indexes_to_select):
         # Single image:             type=Tensor size=torch.Size([1, 1000, 1000, 3])  # or ', 4' for RGBA
@@ -700,7 +823,7 @@ class SelectIndexesFromAny:
     FUNCTION = "execute"
     DESCRIPTION = "Select specific indexes from a set, using a variety of supported syntaxes."
 
-    CATEGORY = "LoadAnimAdv/util"
+    CATEGORY = "LoadAnimAdv/Selectors"
 
     def execute(self, any, indexes_to_select, multi_item_list):
         new_list = []
@@ -714,57 +837,6 @@ class SelectIndexesFromAny:
                 new_list.append( select_indexes_from_any(obj=i, indexes_to_select=indexes_to_select[0]) )
 
         return new_list
-
-class FlattenImageList:
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "optional": {
-                "images": ("IMAGE", {
-                    "tooltip": "Image set to combine.",
-                }),
-                "masks": ("MASK", {
-                    "tooltip": "Mask set to combine.",
-                }),
-            },
-        }
-
-    INPUT_IS_LIST = True
-    RETURN_TYPES = ("IMAGE", "MASK")
-    RETURN_NAMES = ("images", "masks")
-    OUTPUT_TOOLTIPS = (
-        "The combined image set.",
-        "The combined mask set.",
-    )
-    FUNCTION = "execute"
-    DESCRIPTION = "Combines multiple sets of images (eg: from a multi-file load node) into a single set of frames, concatenating them in order."
-
-    CATEGORY = "LoadAnimAdv/image"
-
-    def execute(self, images=[], masks=[]):
-        # Multiple items with INPUT_IS_LIST=True:
-        #     images:    type=list size=2
-        #     images[X]: type=Tensor size=torch.Size([75, 1024, 1024, 3])
-
-        dest_images, dest_masks = None, None
-
-        if len(images) == 0 and len(masks) == 0:
-            print("FlattenImageList: No images or masks provided")
-            return (None, None)
-
-        if len(images) > 0:
-            dest_images = torch.cat(tuple(images), dim=0)
-        else:
-            mask_size = masks[0].size()
-            dest_images = torch.zeros((0, mask_size[1], mask_size[2], 3), dtype=torch.float32, device="cpu")
-
-        if len(masks) > 0:
-            dest_masks = torch.cat(tuple(masks), dim=0)
-        else:
-            image_size = images[0].size()
-            dest_masks = torch.zeros((0, image_size[1], image_size[2], 1), dtype=torch.float32, device="cpu")
-
-        return (dest_images, dest_masks,)
 
 class AggregateNumberList:
     @classmethod
@@ -795,7 +867,7 @@ class AggregateNumberList:
     FUNCTION = "execute"
     DESCRIPTION = "Aggregates a list of numbers into a single number, using a variety of aggregation functions."
 
-    CATEGORY = "LoadAnimAdv/util"
+    CATEGORY = "LoadAnimAdv/FlattenUtils"
 
     def execute(self, numbers, function):
         if len(numbers) == 0:
@@ -813,6 +885,57 @@ class AggregateNumberList:
             result = result[0]
 
         return (result, round(result), len(numbers),)
+
+class FlattenImageList:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "optional": {
+                "images": ("IMAGE", {
+                    "tooltip": "Image set to combine.",
+                }),
+                "masks": ("MASK", {
+                    "tooltip": "Mask set to combine.",
+                }),
+            },
+        }
+
+    INPUT_IS_LIST = True
+    RETURN_TYPES = ("IMAGE", "MASK")
+    RETURN_NAMES = ("images", "masks")
+    OUTPUT_TOOLTIPS = (
+        "The combined image set.",
+        "The combined mask set.",
+    )
+    FUNCTION = "execute"
+    DESCRIPTION = "Combines multiple sets of images (eg: from a multi-file load node) into a single set of frames, concatenating them in order."
+
+    CATEGORY = "LoadAnimAdv/FlattenUtils"
+
+    def execute(self, images=[], masks=[]):
+        # Multiple items with INPUT_IS_LIST=True:
+        #     images:    type=list size=2
+        #     images[X]: type=Tensor size=torch.Size([75, 1024, 1024, 3])
+
+        dest_images, dest_masks = None, None
+
+        if len(images) == 0 and len(masks) == 0:
+            print("FlattenImageList: No images or masks provided")
+            return (None, None)
+
+        if len(images) > 0:
+            dest_images = torch.cat(tuple(images), dim=0)
+        else:
+            mask_size = masks[0].size()
+            dest_images = torch.zeros((0, mask_size[1], mask_size[2], 3), dtype=torch.float32, device="cpu")
+
+        if len(masks) > 0:
+            dest_masks = torch.cat(tuple(masks), dim=0)
+        else:
+            image_size = images[0].size()
+            dest_masks = torch.zeros((0, image_size[1], image_size[2], 1), dtype=torch.float32, device="cpu")
+
+        return (dest_images, dest_masks,)
 
 class FlattenAnyList:
     @classmethod
@@ -834,7 +957,7 @@ class FlattenAnyList:
     FUNCTION = "execute"
     DESCRIPTION = "Flattens a list of any type into a single set, concatenating them in order."
 
-    CATEGORY = "LoadAnimAdv/util"
+    CATEGORY = "LoadAnimAdv/FlattenUtils"
 
     def execute(self, any):
         if len(any) == 0:
@@ -851,149 +974,30 @@ class FlattenAnyList:
 
         return (dest,)
 
-class BasicDimensionVariables:
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {},
-            "optional": {
-                "bus": ("BDV_BUS", {
-                    "tooltip": "BDV bus input, from a previous BDV node.  If provided, will serve as an override for any zeroed inputs.",
-                }),
-                "width": ("INT", {
-                    "tooltip": "Width of the image/video",
-                    "default": 512,
-                    "min": 0,
-                    "max": nodes.MAX_RESOLUTION,
-                    "step": 16,
-                }),
-                "height": ("INT", {
-                    "tooltip": "Height of the image/video",
-                    "default": 512,
-                    "min": 0,
-                    "max": nodes.MAX_RESOLUTION,
-                    "step": 16,
-                }),
-                "frame_count": ("INT", {
-                    "tooltip": "Frame length of the animation/video.  (Sometimes called 'length', in nodes like WanImageToVideo.)",
-                    "default": 81,
-                    "min": 0,
-                    "max": 4096,
-                    "step": 1,
-                }),
-                "batch_size": ("INT", {
-                    "tooltip": "Batch size",
-                    "default": 1,
-                    "min": 0,
-                    "max": 4096,
-                    "step": 1,
-                }),
-                "fps": ("FLOAT", {
-                    "tooltip": "Frames per second",
-                    "default": 12.00,
-                    "min": 0.00,
-                    "max": 60.00,
-                }),
-                "seed": ("INT", {
-                    "tooltip": "Random seed",
-                    "default": 0x123456789abcdef0,
-                    "min": 0,
-                    "max": 0xffffffffffffffff,
-                    "control_after_generate": True,
-                }),
-            },
-        }
-
-    RETURN_TYPES = ("BDV_BUS", "INT", "INT", "INT", "INT", "FLOAT", "INT",)
-    RETURN_NAMES = ("bus", "width", "height", "frame_count", "batch_size", "fps", "seed",)
-    OUTPUT_TOOLTIPS = (
-        "BDV bus output, for use in other BDV nodes.",
-        "Width of the image/video",
-        "Height of the image/video",
-        "Frame length of the animation/video",
-        "Batch size",
-        "Frames per second",
-        "Random seed",
-    )
-    FUNCTION = "execute"
-    DESCRIPTION = (
-        "Input node for declaring basic image/video dimensions, to be propagated to other nodes (such as KSampler).  " +
-        "By having a single source for these values, you only have to change them once.  " +
-        "The BDV Router can be used to route these values to other sections of the workflow."
-    )
-
-    CATEGORY = "LoadAnimAdv/util"
-
-    def execute(self, bus=(0, 0, 0, 0, 0.00, 0), width=0, height=0, frame_count=0, batch_size=0, fps=0.00, seed=0):
-        # Unpack bus, override, repack bus
-        (bus_width, bus_height, bus_frame_count, bus_batch_size, bus_fps, bus_seed) = bus
-
-        out_width       = width       if width       > 0     else bus_width
-        out_height      = height      if height      > 0     else bus_height
-        out_frame_count = frame_count if frame_count > 0     else bus_frame_count
-        out_batch_size  = batch_size  if batch_size  > 0     else bus_batch_size
-        out_fps         = fps         if fps         > 0.00  else bus_fps
-        out_seed        = seed        if seed        > 0     else bus_seed
-
-        out_fps = float(out_fps)
-        out_bus = (out_width, out_height, out_frame_count, out_batch_size, out_fps, out_seed)
-
-        return (out_bus, out_width, out_height, out_frame_count, out_batch_size, out_fps, out_seed,)
-
-class BasicDimensionVariablesRouter:
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "bus": ("BDV_BUS", {
-                    "tooltip": "BDV bus input, from a previous BDV node.",
-                }),
-            },
-        }
-
-    RETURN_TYPES = ("BDV_BUS", "INT", "INT", "INT", "INT", "FLOAT", "INT",)
-    RETURN_NAMES = ("bus", "width", "height", "frame_count", "batch_size", "fps", "seed",)
-    OUTPUT_TOOLTIPS = (
-        "BDV bus output, for use in other BDV nodes.",
-        "Width of the image/video",
-        "Height of the image/video",
-        "Frame length of the animation/video",
-        "Batch size",
-        "Frames per second",
-        "Random seed",
-    )
-    FUNCTION = "execute"
-    DESCRIPTION = "A smaller bus-only 'Basic Dimension Variables' (BDV) node."
-    CATEGORY = "LoadAnimAdv/util"
-
-    def execute(self, bus=(0, 0, 0, 0, 0.00, 0)):
-        (bus_width, bus_height, bus_frame_count, bus_batch_size, bus_fps, bus_seed) = bus
-        return (bus, bus_width, bus_height, bus_frame_count, bus_batch_size, bus_fps, bus_seed,)
-
 NODE_CLASS_MAPPINGS = {
+    "LoadAnimAdv_BasicDimensionVariables":       BasicDimensionVariables,
+    "LoadAnimAdv_BasicDimensionVariablesRouter": BasicDimensionVariablesRouter,
     "LoadAnimAdv_LoadImageVideo":                LoadImageVideo,
     "LoadAnimAdv_LoadImageVideoFromPath":        LoadImageVideoFromPath,
     "LoadAnimAdv_LoadImagesVideosFromDirectory": LoadImagesVideosFromDirectory,
     "LoadAnimAdv_ListFilesFromDirectory":        ListFilesFromDirectory,
     "LoadAnimAdv_SelectIndexesFromImages":       SelectIndexesFromImages,
     "LoadAnimAdv_SelectIndexesFromAny":          SelectIndexesFromAny,
-    "LoadAnimAdv_FlattenImageList":              FlattenImageList,
     "LoadAnimAdv_AggregateNumberList":           AggregateNumberList,
+    "LoadAnimAdv_FlattenImageList":              FlattenImageList,
     "LoadAnimAdv_FlattenAnyList":                FlattenAnyList,
-    "LoadAnimAdv_BasicDimensionVariables":       BasicDimensionVariables,
-    "LoadAnimAdv_BasicDimensionVariablesRouter": BasicDimensionVariablesRouter,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
+    "LoadAnimAdv_BasicDimensionVariables":       "Basic Dimension Variables",
+    "LoadAnimAdv_BasicDimensionVariablesRouter": "BDV (Router)",
     "LoadAnimAdv_LoadImageVideo":                "Load Image/Video",
     "LoadAnimAdv_LoadImageVideoFromPath":        "Load Image/Video From Path",
     "LoadAnimAdv_LoadImagesVideosFromDirectory": "Load Images/Videos From Directory",
     "LoadAnimAdv_ListFilesFromDirectory":        "List Files From Directory",
     "LoadAnimAdv_SelectIndexesFromImages":       "Select Indexes From Images",
     "LoadAnimAdv_SelectIndexesFromAny":          "Select Indexes From Any",
-    "LoadAnimAdv_FlattenImageList":              "Flatten Image List",
     "LoadAnimAdv_AggregateNumberList":           "Aggregate Number List",
+    "LoadAnimAdv_FlattenImageList":              "Flatten Image List",
     "LoadAnimAdv_FlattenAnyList":                "Flatten Any List",
-    "LoadAnimAdv_BasicDimensionVariables":       "Basic Dimension Variables",
-    "LoadAnimAdv_BasicDimensionVariablesRouter": "BDV (Router)",
 }
