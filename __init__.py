@@ -1,7 +1,6 @@
-try:
-    from .nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
-except ImportError:
-    # Fallback for pytest and other situations where relative imports don't work
-    from nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
+from .nodes import NODE_CLASS_MAPPINGS as NODES_CLASS, NODE_DISPLAY_NAME_MAPPINGS as NODES_DISPLAY
+
+NODE_CLASS_MAPPINGS = {**NODES_CLASS}
+NODE_DISPLAY_NAME_MAPPINGS = {**NODES_DISPLAY}
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']

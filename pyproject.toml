@@ -1,19 +1,23 @@
 [project]
 name = "comfyui-loadanim-adv"
 description = "Advanced image and video loading nodes for ComfyUI with comprehensive animation support, batch processing, and flexible frame selection capabilities."
-version = "0.9.0"
+version = "0.9.1"
 license = { file = "LICENSE" }
 dependencies = [
     "torch>=2.0.0",
     "numpy>=1.21.0",
     "Pillow>=9.0.0"
 ]
+classifiers = [
+    "Operating System :: OS Independent"
+]
 
 [project.urls]
 Repository = "https://github.com/SineSwiper/ComfyUI-LoadAnim-Adv"
-#  Used by Comfy Registry https://comfyregistry.org
+Documentation = "https://github.com/SineSwiper/ComfyUI-LoadAnim-Adv/blob/main/README.md"
+"Bug Tracker" = "https://github.com/SineSwiper/ComfyUI-LoadAnim-Adv/issues"
 
 [tool.comfy]
 PublisherId = "sineswiper"
 DisplayName = "ComfyUI-LoadAnim-Adv"
-Icon = ""
+Icon = "https://avatars.githubusercontent.com/u/1041375"
